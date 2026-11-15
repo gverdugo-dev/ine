@@ -24,6 +24,7 @@ de sus tablas, en JSON normalizado o en el CSV que publica el propio INE.
 | `ine series <código>` | Muestra una serie |
 | `ine fetch [tablas...] [-f lista.txt] [--op IPC]` | Descarga muchas tablas a disco |
 | `ine tui [-o dir]` | Navega operaciones y tablas, marca las que quieras y las descarga, con los colores del INE |
+| `ine update [--check]` | Se actualiza a la última release (o a `--version vX.Y.Z`), comprobando el checksum |
 
 Todos aceptan `--json` y `--lang ES|EN`; `get`, `series` y `fetch` aceptan `--last N`,
 `--from` y `--to`. Los filtros ignoran mayúsculas y tildes.
@@ -54,6 +55,8 @@ go install github.com/gverdugo-dev/ine/cmd/ine@latest
 ```
 
 En Windows, el zip de [Releases](https://github.com/gverdugo-dev/ine/releases).
+
+Para actualizar: `ine update` (o `ine update --check` para ver si hay versión nueva).
 
 ## Cómo se usa
 

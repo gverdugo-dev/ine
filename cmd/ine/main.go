@@ -21,6 +21,7 @@ Usage:
   ine series [--json] [period flags] <code>    show one series
   ine fetch  [flags] [table...]            download many tables to disk
   ine tui    [-o dir]                      browse, pick tables and download them
+  ine update [--check] [--version vX.Y.Z]  update ine to the latest release
   ine version                              print the version
 
 Period flags:
@@ -84,6 +85,8 @@ func run(ctx context.Context, args []string) error {
 		return cmdFetch(ctx, rest)
 	case "tui":
 		return cmdTUI(ctx, rest)
+	case "update":
+		return cmdUpdate(ctx, rest)
 	case "version", "--version", "-v":
 		fmt.Println("ine", buildVersion())
 		return nil

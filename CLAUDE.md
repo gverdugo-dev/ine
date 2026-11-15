@@ -67,6 +67,11 @@ ficheros, commits, tags ni releases.
 - **Instalación**: `install.sh` baja `ine_<os>_<arch>.tar.gz` de la última release (los nombres
   no llevan versión a propósito, para que funcione `releases/latest/download`) y comprueba el
   checksum. Cambiar el `name_template` de los archivos rompe el script.
+- **Actualización**: `ine update` (`internal/selfupdate`) lee la última versión de la redirección
+  de `/releases/latest` (no de la API REST de GitHub, por su cuota anónima), baja el archivo de su
+  plataforma con los mismos nombres que `install.sh`, comprueba el checksum y sustituye el
+  ejecutable con un temporal y un rename (en Windows aparta antes el que está en marcha). Una
+  versión que no es de release (`dev`, pseudo-versiones) siempre se considera más antigua.
 - `test.yml` pasa `make test` en cada push a `main` y en cada PR.
 
 ## Comandos
