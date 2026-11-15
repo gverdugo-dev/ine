@@ -136,6 +136,7 @@ func cmdOps(ctx context.Context, args []string) error {
 func cmdTables(ctx context.Context, args []string) error {
 	var c common
 	fs := newFlags("tables", &c, false)
+	web := fs.Bool("web", false, "read the tables from the INEbase pages even when the API lists some")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
@@ -143,14 +144,14 @@ func cmdTables(ctx context.Context, args []string) error {
 	if len(pos) == 0 {
 		return fmt.Errorf("tables needs an operation code, for example: ine tables IPC")
 	}
-	tables, err := c.client().Tables(ctx, pos[0])
+	tables, err := operationTables(ctx, c.client(), pos[0], *web)
 	if err != nil {
 		return err
 	}
 	filter := strings.Join(pos[1:], " ")
 	var out []ine.Table
 	for _, t := range tables {
-		if matches(filter, t.Name, strconv.Itoa(t.ID)) {
+		if matches(filter, t.Name, t.Group, strconv.Itoa(t.ID)) {
 			out = append(out, t)
 		}
 	}
@@ -158,15 +159,34 @@ func cmdTables(ctx context.Context, args []string) error {
 		return printJSON(out)
 	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tUPDATED\tNAME")
+	fmt.Fprintln(tw, "ID\tUPDATED\tSOURCE\tNAME")
 	for _, t := range out {
-		updated := ""
+		updated, source, name := "", "api", t.Name
 		if !t.LastModified.IsZero() {
 			updated = t.LastModified.Format("2006-01-02")
 		}
-		fmt.Fprintf(tw, "%d\t%s\t%s\n", t.ID, updated, t.Name)
+		if t.FromWeb {
+			source = "web"
+			if t.Group != "" {
+				name = t.Group + " / " + t.Name
+			}
+		}
+		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", t.ID, updated, source, name)
 	}
 	return tw.Flush()
+}
+
+// operationTables resolves an operation code or id and returns its tables:
+// the API's list, or the INEbase pages when that list is empty or web is set.
+func operationTables(ctx context.Context, cl *ine.Client, operation string, web bool) ([]ine.Table, error) {
+	op, err := cl.Operation(ctx, operation)
+	if err != nil {
+		return nil, err
+	}
+	if web {
+		return cl.WebTables(ctx, op)
+	}
+	return cl.AllTables(ctx, op)
 }
 
 func cmdGet(ctx context.Context, args []string) error {
@@ -267,7 +287,7 @@ func cmdFetch(ctx context.Context, args []string) error {
 		tables = append(tables, fromFile...)
 	}
 	for _, op := range ops {
-		ts, err := cl.Tables(ctx, op)
+		ts, err := operationTables(ctx, cl, op, false)
 		if err != nil {
 			return fmt.Errorf("operation %s: %w", op, err)
 		}

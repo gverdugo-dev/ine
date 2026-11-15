@@ -19,7 +19,7 @@ de sus tablas, en JSON normalizado o en el CSV que publica el propio INE.
 | Comando | Qué hace |
 |---------|----------|
 | `ine ops [filtro]` | Lista las operaciones estadísticas (IPC, EPA, ...) |
-| `ine tables <operación> [filtro]` | Lista las tablas de una operación, con su fecha de actualización |
+| `ine tables <operación> [filtro]` | Lista las tablas de una operación. Si la API no lista ninguna, las busca en las páginas de INEbase (`--web` lo fuerza) |
 | `ine get <tabla>` | Muestra las series de una tabla (por defecto, el último periodo) |
 | `ine series <código>` | Muestra una serie |
 | `ine fetch [tablas...] [-f lista.txt] [--op IPC]` | Descarga muchas tablas a disco |
@@ -27,6 +27,11 @@ de sus tablas, en JSON normalizado o en el CSV que publica el propio INE.
 
 Todos aceptan `--json` y `--lang ES|EN`; `get`, `series` y `fetch` aceptan `--last N`,
 `--from` y `--to`. Los filtros ignoran mayúsculas y tildes.
+
+La lista de tablas por operación de la API del INE está incompleta: muchas operaciones (I+D,
+TIC, cuentas medioambientales, salud, discapacidad...) salen vacías aunque sus tablas se puedan
+descargar. `ine` las encuentra leyendo la web de INEbase y las descarga por la API como las
+demás. Lo que el INE solo publica en xlsx, PDF o visores queda fuera.
 
 `fetch` descarga en paralelo (`-j`, 4 por defecto) con un mínimo de 200 ms entre peticiones
 (`--interval`), escribe `<tabla>.json` y/o `<tabla>.csv` (`--format json,csv`), salta lo que ya

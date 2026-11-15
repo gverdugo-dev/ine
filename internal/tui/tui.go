@@ -126,10 +126,15 @@ func (i tableItem) Description() string {
 	if !i.t.LastModified.IsZero() {
 		d += " · actualizada " + i.t.LastModified.Format("02/01/2006")
 	}
+	if i.t.FromWeb {
+		d += " · " + i.t.Group + " · vía ine.es"
+	}
 	return d
 }
 
-func (i tableItem) FilterValue() string { return fold(strconv.Itoa(i.t.ID) + " " + i.t.Name) }
+func (i tableItem) FilterValue() string {
+	return fold(strconv.Itoa(i.t.ID) + " " + i.t.Name + " " + i.t.Group)
+}
 
 type (
 	opsLoadedMsg struct {
@@ -208,7 +213,7 @@ func (m model) loadOps() tea.Cmd {
 
 func (m model) loadTables(op ine.Operation) tea.Cmd {
 	return func() tea.Msg {
-		ts, err := m.client.Tables(m.ctx, op.Code)
+		ts, err := m.client.AllTables(m.ctx, op)
 		return tablesLoadedMsg{op, ts, err}
 	}
 }
@@ -257,6 +262,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
+		}
+		if len(msg.tables) == 0 {
+			return m, m.ops.NewStatusMessage(statusMsgSty.Render(msg.op.Code + " no publica tablas: en ine.es solo hay ficheros, PDF o un visor"))
 		}
 		m.current = msg.op
 		items := make([]list.Item, len(msg.tables))
@@ -308,7 +316,7 @@ func (m model) updateOps(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(k, keyOpen):
 			if it, ok := m.ops.SelectedItem().(opItem); ok {
-				m.loading = "Cargando tablas de " + it.op.Code
+				m.loading = "Cargando tablas de " + it.op.Code + " (si la API no las lista, se buscan en ine.es)"
 				return m, tea.Batch(m.spinner.Tick, m.loadTables(it.op))
 			}
 		case key.Matches(k, keyDownload) && len(m.sel.order) > 0:

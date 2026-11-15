@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 )
 
 const usage = `ine: browse and bulk-download INE tables (Tempus3 API).
@@ -35,7 +36,11 @@ func main() {
 	defer stop()
 	if err := run(ctx, os.Args[1:]); err != nil {
 		if !errors.Is(err, errUsage) {
-			fmt.Fprintln(os.Stderr, "ine:", err)
+			msg := err.Error()
+			if !strings.HasPrefix(msg, "ine:") {
+				msg = "ine: " + msg
+			}
+			fmt.Fprintln(os.Stderr, msg)
 		}
 		os.Exit(1)
 	}

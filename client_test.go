@@ -21,7 +21,7 @@ func testClient(t *testing.T, h http.HandlerFunc) *Client {
 	t.Cleanup(srv.Close)
 	c := New()
 	c.BaseURL = srv.URL
-	c.CSVBaseURL = srv.URL
+	c.WebBaseURL = srv.URL
 	c.Retries = 2
 	return c
 }
@@ -112,8 +112,8 @@ func TestTransientErrorsAreRetried(t *testing.T) {
 
 func TestTableCSVPath(t *testing.T) {
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/es/csv_bdsc/50902.csv" {
-			http.NotFound(w, r)
+		if r.URL.Path != "/jaxi/files/tpx/es/csv_bdsc/50902.csv" {
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		w.Write([]byte("a;b\n1;2\n"))
@@ -123,4 +123,23 @@ func TestTableCSVPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	body.Close()
+}
+
+func TestTableCSVUnknownIsNotFound(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	if _, err := c.TableCSV(context.Background(), "1"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestVolumeRestrictionIsTooLarge(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status" : "No puede mostrarse por restricciones de volumen"}`))
+	})
+	_, err := c.TableData(context.Background(), "80107", Query{Last: 1})
+	if !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("err = %v", err)
+	}
 }

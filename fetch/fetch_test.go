@@ -26,7 +26,7 @@ func TestRunWritesSkipsAndFails(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := ine.New()
-	c.BaseURL, c.CSVBaseURL = srv.URL, srv.URL
+	c.BaseURL, c.WebBaseURL = srv.URL, srv.URL
 
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "3.json"), []byte("old"), 0o644); err != nil {

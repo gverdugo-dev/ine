@@ -8,11 +8,24 @@ navegar su catálogo y descargar muchas tablas de golpe, también desde una TUI 
 - Base `https://servicios.ine.es/wstempus/js/{ES|EN}/{FUNCION}/{input}`, sin clave ni login.
 - Funciones que usa el cliente: `OPERACIONES_DISPONIBLES`, `OPERACION`, `TABLAS_OPERACION`,
   `DATOS_TABLA` y `DATOS_SERIE`. Para cualquier otra, `Client.RawJSON`.
-- CSV por tabla en `https://www.ine.es/jaxiT3/files/t/{es|en}/csv_bdsc/{id}.csv`: separador `;`,
+- CSV por tabla en dos rutas según la familia de la tabla: `jaxiT3/files/t/{es|en}/csv_bdsc/{id}.csv`
+  para las de Tempus3 y `jaxi/files/tpx/{es|en}/csv_bdsc/{id}.csv` para las PC-Axis servidas por
+  Tempus3 ("tpx"). `TableCSV` prueba la primera y, si responde 204, la segunda. Separador `;`,
   coma decimal y UTF-8 con BOM, aunque la cabecera diga ISO-8859-15.
 - Errores: la API no devuelve JSON de error. Una tabla desconocida da 404 en HTML, una
   operación desconocida da 500 en HTML y un CSV desconocido da 204. Las tres son
   `ErrNotFound` y no se reintentan; los 429 y demás 5xx sí, con backoff.
+- **Restricción de volumen**: con algunas tablas grandes y un filtro de periodos (`nult`,
+  `date`), la API responde `{"status": "No puede mostrarse por restricciones de volumen"}`. Es
+  `ErrTooLarge`; la misma tabla sin filtro o su CSV sí se sirven.
+- **`TABLAS_OPERACION` está incompleta**: en noviembre de 2026, 57 de las 166 operaciones
+  devolvían una lista vacía y, de ellas, 39 tenían tablas en la web que `DATOS_TABLA` sirve sin
+  problema (sobre todo las "tpx"). `WebTables` las encuentra leyendo las páginas de INEbase:
+  la pestaña de resultados de la operación (`&menu=resultados`) enlaza a índices
+  `/dynt3/inebase/index.htm?padre=P&capsel=C`; cada índice despliega un capítulo con sus tablas
+  (`/jaxi/Tabla.htm?tpx=N` o `/jaxiT3/Tabla.htm?t=N`) y enlaza los demás capítulos como
+  `?padre=P&capsel=X`. `AllTables` usa la API y, si no lista nada, la web. Las 18 operaciones
+  restantes solo publican xlsx, PDF, microdatos o un visor, o no tienen página en la API.
 
 ## Decisiones
 
@@ -21,6 +34,9 @@ navegar su catálogo y descargar muchas tablas de golpe, también desde una TUI 
 - **Tipos propios en inglés** (`Operation`, `Table`, `Series`, `Variable`, `Point`) con
   `UnmarshalJSON` que lee los nombres del INE. El JSON que escribe la CLI usa los nombres
   propios, nunca los del INE.
+- Las tablas encontradas en la web llevan `FromWeb` y el capítulo en `Group`; la CLI las marca
+  como `web` y la TUI como "vía ine.es". Se pide por id de operación, no por código, porque hay
+  códigos repetidos (`OCE`, `CTNFSI`).
 - `Point.Value` es un puntero: `nil` cuando el INE no publica el dato.
 - `Ultima_Modificacion` se parsea en `Europe/Madrid` para que Go resuelva CET y CEST.
 - **Descarga masiva** (`fetch`): workers en paralelo con un limitador común (200 ms por defecto

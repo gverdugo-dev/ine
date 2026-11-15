@@ -23,8 +23,14 @@ import (
 // DefaultBaseURL is the root of the Tempus3 JSON API.
 const DefaultBaseURL = "https://servicios.ine.es/wstempus/js"
 
-// DefaultCSVBaseURL is the root of the per table CSV downloads.
-const DefaultCSVBaseURL = "https://www.ine.es/jaxiT3/files/t"
+// DefaultWebBaseURL is the root of www.ine.es, where the per table CSV
+// downloads and the INEbase result indexes live.
+const DefaultWebBaseURL = "https://www.ine.es"
+
+// ErrTooLarge is returned when the API refuses a table "por restricciones de
+// volumen". It happens with large tables when a period filter (nult, date) is
+// sent: the same table without a filter, or its CSV, is served.
+var ErrTooLarge = errors.New("ine: table refused for its size; ask for all periods or download its CSV")
 
 // ErrNotFound is returned when the INE answers with an HTML error page,
 // which is what it does for an unknown table, series or operation.
@@ -33,7 +39,7 @@ var ErrNotFound = errors.New("ine: not found")
 // Client talks to the INE API. The zero value is not usable: build it with New.
 type Client struct {
 	BaseURL    string
-	CSVBaseURL string
+	WebBaseURL string
 	// Lang is "ES" or "EN".
 	Lang string
 	HTTP *http.Client
@@ -48,7 +54,7 @@ type Client struct {
 func New() *Client {
 	return &Client{
 		BaseURL:    DefaultBaseURL,
-		CSVBaseURL: DefaultCSVBaseURL,
+		WebBaseURL: DefaultWebBaseURL,
 		Lang:       "ES",
 		HTTP:       &http.Client{Timeout: 60 * time.Second},
 		Retries:    3,
@@ -129,17 +135,32 @@ func (c *Client) SeriesData(ctx context.Context, series string, q Query) (Series
 
 // TableCSV opens the CSV the INE publishes for a table: semicolon separated,
 // comma as decimal mark, UTF-8 with a BOM. The caller closes the body.
+//
+// Tables come in two families that share the id space of DATOS_TABLA: the
+// Tempus3 ones (jaxiT3, "t=") and the PC-Axis ones served through Tempus3
+// (jaxi, "tpx="). Their CSVs live under different paths, so the T3 path is
+// tried first and the tpx one when the first answers 204.
 func (c *Client) TableCSV(ctx context.Context, table string) (io.ReadCloser, error) {
-	u := fmt.Sprintf("%s/%s/csv_bdsc/%s.csv", c.CSVBaseURL, strings.ToLower(c.Lang), url.PathEscape(table))
-	resp, err := c.do(ctx, u)
-	if err != nil {
-		return nil, err
+	lang := strings.ToLower(c.Lang)
+	id := url.PathEscape(table)
+	var err error
+	for _, path := range []string{"/jaxiT3/files/t/", "/jaxi/files/tpx/"} {
+		var resp *http.Response
+		resp, err = c.do(ctx, c.WebBaseURL+path+lang+"/csv_bdsc/"+id+".csv")
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+			resp.Body.Close()
+			err = ErrNotFound
+			continue
+		}
+		return resp.Body, nil
 	}
-	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
-		resp.Body.Close()
-		return nil, fmt.Errorf("%w: table %s", ErrNotFound, table)
-	}
-	return resp.Body, nil
+	return nil, fmt.Errorf("%w: table %s", ErrNotFound, table)
 }
 
 // RawJSON returns the untouched JSON body of any Tempus3 function, for the
@@ -170,6 +191,18 @@ func (c *Client) getJSON(ctx context.Context, function, input string, params url
 	trimmed := strings.TrimSpace(string(body))
 	if trimmed == "" || trimmed == "null" {
 		return fmt.Errorf("%w: %s %s", ErrNotFound, function, input)
+	}
+	// Refusals come as an object with a status message, whatever the call.
+	if trimmed[0] == '{' {
+		var st struct {
+			Status string `json:"status"`
+		}
+		if json.Unmarshal(body, &st) == nil && st.Status != "" {
+			if strings.Contains(strings.ToLower(st.Status), "volumen") {
+				return fmt.Errorf("%w (%s %s: %s)", ErrTooLarge, function, input, st.Status)
+			}
+			return fmt.Errorf("ine: %s %s: %s", function, input, st.Status)
+		}
 	}
 	if err := json.Unmarshal(body, dst); err != nil {
 		return fmt.Errorf("ine: decode %s %s: %w", function, input, err)

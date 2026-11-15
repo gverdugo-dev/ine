@@ -43,6 +43,12 @@ type Table struct {
 	PeriodicityID int       `json:"periodicityId,omitempty"`
 	FirstYear     string    `json:"firstYear,omitempty"`
 	LastModified  time.Time `json:"lastModified,omitempty"`
+	// Group is the INEbase chapter the table hangs from. Only tables found on
+	// the web (FromWeb) carry it.
+	Group string `json:"group,omitempty"`
+	// FromWeb marks a table the API does not list for its operation, found on
+	// the INEbase pages instead. DATOS_TABLA serves it all the same.
+	FromWeb bool `json:"fromWeb,omitempty"`
 }
 
 type wireTable struct {
