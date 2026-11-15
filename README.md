@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.jpg" alt="Fachada modernista de tejado ondulado, balcones curvos y dos torres, en granate y verde azulado sobre menta" width="100%">
+</p>
+
 # ine
 
 Cliente en Go y CLI para navegar el catálogo del INE y descargar de golpe los datos de muchas
